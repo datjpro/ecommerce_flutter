@@ -1,0 +1,121 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/taskbar_widget.dart';
+import '../widgets/bottom_widhet.dart';
+import 'setting_screen.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({Key? key}) : super(key: key);
+
+  void _navigateToSetting(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingScreen()),
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token'); // Xóa token
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/home',
+      (route) => false,
+    ); // Quay về HomeScreen và xóa stack
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SafeArea(
+        child: Column(
+          children: [
+            TaskbarWidget(),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(height: 24),
+                      CircleAvatar(
+                        radius: 48,
+                        backgroundImage: AssetImage(
+                          'assets/avatar.png',
+                        ), // Thay bằng ảnh thật nếu có
+                        backgroundColor: Colors.orange[100],
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Tên người dùng',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'email@example.com',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      ),
+                      SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _navigateToSetting(context),
+                        icon: Icon(Icons.settings),
+                        label: Text('Chỉnh sửa thông tin'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 32),
+                      // Thêm các mục khác nếu muốn
+                      ListTile(
+                        leading: Icon(Icons.history, color: Colors.orange),
+                        title: Text('Lịch sử đơn hàng'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {},
+                      ),
+                      Divider(),
+                      ListTile(
+                        leading: Icon(Icons.favorite, color: Colors.red),
+                        title: Text('Sản phẩm yêu thích'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {},
+                      ),
+                      Divider(),
+                      ListTile(
+                        leading: Icon(Icons.local_offer, color: Colors.green),
+                        title: Text('Khuyến mãi'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {},
+                      ),
+                      Divider(),
+                      ListTile(
+                        leading: Icon(Icons.help, color: Colors.blue),
+                        title: Text('Trợ giúp'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {},
+                      ),
+                      Divider(),
+                      ListTile(
+                        leading: Icon(Icons.logout, color: Colors.red),
+                        title: Text('Đăng xuất'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          _logout(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: BottomWidget(),
+    );
+  }
+}
