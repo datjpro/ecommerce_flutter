@@ -6,6 +6,7 @@ import '../widgets/category_widget.dart';
 import '../widgets/shop_mall_widget.dart';
 import '../widgets/top_search_widget.dart';
 import '../widgets/product_widget.dart';
+import '../screens/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onScrollToTop;
@@ -26,6 +27,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void navigateToSearchScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SearchScreen()),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +45,21 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         controller: _scrollController,
         children: [
-          TaskbarWidget(),
+          TaskbarWidget(
+            onSearch: null, // Không truyền hoặc truyền null
+            onSubmitted: (searchText) {
+              if (searchText.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            SearchScreen(initialSearchText: searchText),
+                  ),
+                );
+              }
+            },
+          ),
           SlideWidget(),
           CategoryWidget(),
           ShopMallWidget(),

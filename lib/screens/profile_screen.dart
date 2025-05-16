@@ -3,9 +3,36 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/taskbar_widget.dart';
 import '../widgets/bottom_widhet.dart';
 import 'setting_screen.dart';
+import 'discount_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  _ProfileScreenState createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String _userId = 'Không xác định';
+  String _email = 'email@example.com';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('userId');
+  print('DEBUG: userId from SharedPreferences: $userId');
+  setState(() {
+    _userId = userId ?? 'Không xác định';
+    _email = prefs.getString('email') ?? 'email@example.com';
+  });
+}
+
 
   void _navigateToSetting(BuildContext context) {
     Navigator.push(
@@ -17,6 +44,8 @@ class ProfileScreen extends StatelessWidget {
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token'); // Xóa token
+    await prefs.remove('userId'); // Xóa userId
+    await prefs.remove('email'); // Xóa email
     Navigator.of(context).pushNamedAndRemoveUntil(
       '/home',
       (route) => false,
@@ -41,22 +70,22 @@ class ProfileScreen extends StatelessWidget {
                       SizedBox(height: 24),
                       CircleAvatar(
                         radius: 48,
-                        backgroundImage: AssetImage(
-                          'assets/avatar.png',
-                        ), // Thay bằng ảnh thật nếu có
+                        // Thay bằng ảnh thật nếu có
                         backgroundColor: Colors.orange[100],
                       ),
                       SizedBox(height: 16),
                       Text(
-                        'Tên người dùng',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+  'ID người dùng: $_userId',
+  style: TextStyle(
+    fontSize: 16,
+    color: Colors.grey[800],
+    fontWeight: FontWeight.w500,
+  ),
+),
+
                       SizedBox(height: 8),
                       Text(
-                        'email@example.com',
+                        _email,
                         style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                       ),
                       SizedBox(height: 16),
@@ -89,7 +118,12 @@ class ProfileScreen extends StatelessWidget {
                         leading: Icon(Icons.local_offer, color: Colors.green),
                         title: Text('Khuyến mãi'),
                         trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => DiscountScreen()),
+                          );
+                        },
                       ),
                       Divider(),
                       ListTile(

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -37,8 +38,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final token = data['token'];
+          final userId = data['user']?['id'];
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
+          if (userId != null) {
+  await prefs.setString('userId', userId);
+}
+
 
           setState(() {
             _isLoading = false;
@@ -206,7 +212,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Text('Chưa có tài khoản?'),
                           TextButton(
                             onPressed: () {
-                              // TODO: Điều hướng sang màn hình đăng ký
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RegisterScreen(),
+                                ),
+                              );
                             },
                             child: Text(
                               'Đăng ký ngay',

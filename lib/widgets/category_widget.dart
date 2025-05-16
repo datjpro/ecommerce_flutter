@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../screens/category_list_screen.dart';
 
 class CategoryWidget extends StatefulWidget {
   @override
@@ -65,45 +66,61 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                       itemCount: categories.length,
                       itemBuilder: (context, index) {
                         final item = categories[index];
-                        return Container(
-                          width: 110, // Tăng width
-                          margin: EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 4,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 36, // Icon to hơn
-                                backgroundColor: Colors.blue.withOpacity(0.2),
-                                backgroundImage:
-                                    item['image'] != null &&
-                                            item['image'].toString().isNotEmpty
-                                        ? NetworkImage(item['image'])
-                                        : null,
-                                child:
-                                    item['image'] == null ||
-                                            item['image'].toString().isEmpty
-                                        ? Icon(
-                                          Icons.category,
-                                          color: Colors.blue,
-                                          size: 32, // Icon to hơn
-                                        )
-                                        : null,
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => CategoryListScreen(
+                                      categoryId: item['_id'].toString(),
+                                      categoryName: item['name'] ?? '',
+                                    ),
                               ),
-                              SizedBox(height: 10),
-                              Text(
-                                item['name'] ?? '',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                            );
+                          },
+                          child: Container(
+                            width: 110, // Tăng width
+                            margin: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius: 36, // Icon to hơn
+                                  backgroundColor: Colors.blue.withOpacity(0.2),
+                                  backgroundImage:
+                                      item['image'] != null &&
+                                              item['image']
+                                                  .toString()
+                                                  .isNotEmpty
+                                          ? NetworkImage(item['image'])
+                                          : null,
+                                  child:
+                                      item['image'] == null ||
+                                              item['image'].toString().isEmpty
+                                          ? Icon(
+                                            Icons.category,
+                                            color: Colors.blue,
+                                            size: 32, // Icon to hơn
+                                          )
+                                          : null,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                                SizedBox(height: 10),
+                                Text(
+                                  item['name'] ?? '',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },

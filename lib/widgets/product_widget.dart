@@ -24,19 +24,25 @@ class _ProductWidgetState extends State<ProductWidget> {
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          products = data['products'] ?? [];
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            products = data['products'] ?? [];
+            isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
