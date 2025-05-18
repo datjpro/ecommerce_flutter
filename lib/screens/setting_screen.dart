@@ -55,7 +55,9 @@ class _SettingScreenState extends State<SettingScreen> {
         return;
       }
 
-      final url = Uri.parse('http://localhost:3002/customer/api/by-user/$userId');
+      final url = Uri.parse(
+        'http://localhost:3002/api/customer/by-user/$userId',
+      );
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -63,9 +65,10 @@ class _SettingScreenState extends State<SettingScreen> {
         fullNameController.text = customerData!['fullName'] ?? '';
         phoneController.text = customerData!['phone'] ?? '';
         addressController.text = customerData!['address'] ?? '';
-        birthdayController.text = customerData!['birthday'] != null
-            ? customerData!['birthday'].toString().substring(0, 10)
-            : '';
+        birthdayController.text =
+            customerData!['birthday'] != null
+                ? customerData!['birthday'].toString().substring(0, 10)
+                : '';
         gender = customerData!['gender'] ?? 'Nam';
 
         setState(() {
@@ -90,7 +93,9 @@ class _SettingScreenState extends State<SettingScreen> {
       updating = true;
     });
 
-    final url = Uri.parse('http://localhost:3002/customer/api/update-by-user/$userId');
+    final url = Uri.parse(
+      'http://localhost:3002/api/customer/update-by-user/$userId',
+    );
     final body = json.encode({
       "fullName": fullNameController.text,
       "phone": phoneController.text,
@@ -108,18 +113,18 @@ class _SettingScreenState extends State<SettingScreen> {
 
       if (response.statusCode == 200) {
         await fetchCustomerInfo();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cập nhật thành công!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cập nhật thành công!')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Cập nhật thất bại: ${response.body}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi kết nối: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi kết nối: $e')));
     } finally {
       setState(() {
         updating = false;
@@ -150,7 +155,9 @@ class _SettingScreenState extends State<SettingScreen> {
                         ? fullNameController.text
                         : "Khách hàng",
                     style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 20),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -207,91 +214,111 @@ class _SettingScreenState extends State<SettingScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.blue.shade700,
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
+      body:
+          loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
               ? Center(child: Text(error!))
               : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListView(
-                    children: [
-                      _buildProfileHeader(),
-                      const SizedBox(height: 20),
-                      Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              _buildTextField(
-                                controller: fullNameController,
-                                label: 'Họ tên',
-                                icon: Icons.person_outline,
-                              ),
-                              _buildTextField(
-                                controller: phoneController,
-                                label: 'Số điện thoại',
-                                icon: Icons.phone,
-                                keyboardType: TextInputType.phone,
-                              ),
-                              _buildTextField(
-                                controller: addressController,
-                                label: 'Địa chỉ',
-                                icon: Icons.location_on_outlined,
-                              ),
-                              _buildTextField(
-                                controller: birthdayController,
-                                label: 'Ngày sinh (YYYY-MM-DD)',
-                                icon: Icons.cake_outlined,
-                                readOnly: true,
-                                onTap: () async {
-                                  FocusScope.of(context).requestFocus(FocusNode());
-                                  DateTime? picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: birthdayController.text.isNotEmpty
-                                        ? DateTime.parse(birthdayController.text)
-                                        : DateTime(1990, 1, 1),
-                                    firstDate: DateTime(1900),
-                                    lastDate: DateTime.now(),
-                                  );
-                                  if (picked != null) {
-                                    birthdayController.text =
-                                        picked.toIso8601String().substring(0, 10);
-                                  }
-                                },
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                child: DropdownButtonFormField<String>(
-                                  value: gender,
-                                  items: ['Nam', 'Nữ', 'Khác']
-                                      .map((g) => DropdownMenuItem(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: ListView(
+                  children: [
+                    _buildProfileHeader(),
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            _buildTextField(
+                              controller: fullNameController,
+                              label: 'Họ tên',
+                              icon: Icons.person_outline,
+                            ),
+                            _buildTextField(
+                              controller: phoneController,
+                              label: 'Số điện thoại',
+                              icon: Icons.phone,
+                              keyboardType: TextInputType.phone,
+                            ),
+                            _buildTextField(
+                              controller: addressController,
+                              label: 'Địa chỉ',
+                              icon: Icons.location_on_outlined,
+                            ),
+                            _buildTextField(
+                              controller: birthdayController,
+                              label: 'Ngày sinh (YYYY-MM-DD)',
+                              icon: Icons.cake_outlined,
+                              readOnly: true,
+                              onTap: () async {
+                                FocusScope.of(
+                                  context,
+                                ).requestFocus(FocusNode());
+                                DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      birthdayController.text.isNotEmpty
+                                          ? DateTime.parse(
+                                            birthdayController.text,
+                                          )
+                                          : DateTime(1990, 1, 1),
+                                  firstDate: DateTime(1900),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  birthdayController.text = picked
+                                      .toIso8601String()
+                                      .substring(0, 10);
+                                }
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: DropdownButtonFormField<String>(
+                                value: gender,
+                                items:
+                                    ['Nam', 'Nữ', 'Khác']
+                                        .map(
+                                          (g) => DropdownMenuItem(
                                             value: g,
                                             child: Text(g),
-                                          ))
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      gender = value!;
-                                    });
-                                  },
-                                  decoration: InputDecoration(
-                                    prefixIcon: Icon(Icons.wc, color: Colors.blue.shade700),
-                                    labelText: 'Giới tính',
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12)),
-                                    filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    gender = value!;
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.wc,
+                                    color: Colors.blue.shade700,
                                   ),
+                                  labelText: 'Giới tính',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
                                 ),
                               ),
-                              const SizedBox(height: 18),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  icon: updating
-                                      ? const SizedBox(
+                            ),
+                            const SizedBox(height: 18),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                icon:
+                                    updating
+                                        ? const SizedBox(
                                           width: 20,
                                           height: 20,
                                           child: CircularProgressIndicator(
@@ -299,28 +326,33 @@ class _SettingScreenState extends State<SettingScreen> {
                                             color: Colors.white,
                                           ),
                                         )
-                                      : const Icon(Icons.save_alt),
-                                  label: const Text(
-                                    'Lưu thay đổi',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        : const Icon(Icons.save_alt),
+                                label: const Text(
+                                  'Lưu thay đổi',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    backgroundColor: Colors.blue.shade700,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  onPressed: updating ? null : updateCustomerInfo,
                                 ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  backgroundColor: Colors.blue.shade700,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: updating ? null : updateCustomerInfo,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
     );
   }
 }

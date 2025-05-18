@@ -12,7 +12,7 @@ class BottomWidget extends StatefulWidget {
 class _BottomWidgetState extends State<BottomWidget> {
   int _selectedIndex = 0;
 
-  final List<String> _routes = ['/home', '/chat', '/notifications', '/account'];
+  final List<String> _routes = ['/home', '/ai', '/notifications', '/account'];
 
   void _updateSelectedIndex(BuildContext context) {
     final String? route = ModalRoute.of(context)?.settings.name;
@@ -36,7 +36,10 @@ class _BottomWidgetState extends State<BottomWidget> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 3) {
+    if (index == 1) {
+      // Trò chuyện (AI Chat)
+      Navigator.pushNamed(context, '/ai');
+    } else if (index == 3) {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       if (token == null) {
