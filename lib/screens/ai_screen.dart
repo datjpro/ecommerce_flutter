@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
 class AIScreen extends StatefulWidget {
@@ -17,23 +16,20 @@ class _AIScreenState extends State<AIScreen> {
   bool _loadingProducts = true;
   List<Map<String, dynamic>> products = [];
 
-  final String _apiKey =
-      'xai-3euSc4v3T9XtD3CBkKyUZfd01KnqdTMAzDavHx7kM6PpPs6821x23SrI28U0KtbIgiLwiqLjLkYSk5wU';
-
   @override
   void initState() {
     super.initState();
     fetchProducts();
   }
 
-  // Đọc sản phẩm từ file assets
+  // Đọc sản phẩm từ API
   Future<void> fetchProducts() async {
     setState(() {
       _loadingProducts = true;
     });
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:4003/api/product/all'),
+        Uri.parse('http://10.0.2.2:4003/api/product/all'),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -49,54 +45,43 @@ class _AIScreenState extends State<AIScreen> {
     });
   }
 
-  // Tạo messages chuẩn OpenAI API
-  List<Map<String, dynamic>> _buildMessages(String userPrompt) {
-    final productInfo = products
-        .map(
-          (p) =>
-              '- ${p['name'] ?? ''} (${p['price'] ?? ''}): ${p['describe'] ?? ''}', // Sửa 'desc' thành 'describe'
-        )
-        .join('\n');
-    return [
-      {
-        "role": "system",
-        "content":
-            "Bạn là trợ lý AI Grok cho cửa hàng online. Dưới đây là danh sách sản phẩm hiện có:\n$productInfo\n"
-            "Khi người dùng hỏi, hãy gợi ý các sản phẩm phù hợp nhất với nhu cầu, sở thích hoặc từ khóa mà họ đưa ra. "
-            "Nếu không tìm thấy sản phẩm phù hợp, hãy lịch sự thông báo và gợi ý các sản phẩm nổi bật khác.",
-      },
-      ..._messages.map((m) => {"role": m['role'], "content": m['content']}),
-      {"role": "user", "content": userPrompt},
-    ];
+  Future<List<Map<String, String>>> parseProductsFromAnswer(
+    String answer,
+  ) async {
+    final List<Map<String, String>> products = [];
+    final regex = RegExp(
+      r'-{9,} SẢN PHẨM \d+ -{9,}\nMã: (.+)\nTên: (.+)\nGiá: (.+)\nTình trạng: (.+)\nDanh mục: (.+)\nNgười bán: (.+)',
+      multiLine: true,
+    );
+    for (final match in regex.allMatches(answer)) {
+      products.add({
+        'id': match.group(1) ?? '',
+        'name': match.group(2) ?? '',
+        'price': match.group(3) ?? '',
+        'status': match.group(4) ?? '',
+        'category': match.group(5) ?? '',
+        'seller': match.group(6) ?? '',
+      });
+    }
+    return products;
   }
 
-  Future<String> sendMessageToGrok(
-    List<Map<String, dynamic>> messages,
-    String apiKey,
-  ) async {
-    final response = await http.post(
-      Uri.parse('https://api.x.ai/v1/chat/completions'),
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'grok-3-beta',
-        'messages': messages,
-        'stream': false,
-        'temperature': 0.7,
-        'max_tokens': 512,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['choices']?[0]?['message']?['content'] ??
-          'Không có phản hồi.';
-    } else {
-      throw Exception(
-        'Không thể nhận phản hồi: ${response.statusCode} - ${response.body}',
+  Future<String> sendMessageToFlaskAPI(String userMessage) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:5000/chat'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'message': userMessage}),
       );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['answer'] ?? 'Không có phản hồi.';
+      } else {
+        return 'Không thể kết nối với dịch vụ tìm kiếm. Mã lỗi: ${response.statusCode}';
+      }
+    } catch (e) {
+      return 'Lỗi kết nối: ${e.toString()}';
     }
   }
 
@@ -110,11 +95,33 @@ class _AIScreenState extends State<AIScreen> {
     });
 
     try {
-      final messages = _buildMessages(prompt);
-      final reply = await sendMessageToGrok(messages, _apiKey);
-      setState(() {
-        _messages.add({'role': 'assistant', 'content': reply});
-      });
+      final reply = await sendMessageToFlaskAPI(prompt);
+      final productList = await parseProductsFromAnswer(reply);
+      if (productList.isNotEmpty) {
+        setState(() {
+          _messages.add({
+            'role': 'assistant',
+            'content': reply,
+            'type': 'products',
+          });
+          _messages.addAll(
+            productList.map(
+              (p) => {
+                'role': 'product',
+                'name': p['name'] ?? '',
+                'price': p['price'] ?? '',
+                'status': p['status'] ?? '',
+                'category': p['category'] ?? '',
+                'seller': p['seller'] ?? '',
+              },
+            ),
+          );
+        });
+      } else {
+        setState(() {
+          _messages.add({'role': 'assistant', 'content': reply});
+        });
+      }
     } catch (e) {
       setState(() {
         _messages.add({'role': 'assistant', 'content': 'Lỗi: ${e.toString()}'});
@@ -138,13 +145,24 @@ class _AIScreenState extends State<AIScreen> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         title: Text(p['name']?.toString() ?? ''),
-        subtitle: Text(p['desc']?.toString() ?? ''),
+        subtitle: Text(p['describe']?.toString() ?? ''),
         trailing: Text(p['price']?.toString() ?? ''),
       ),
     );
   }
 
   Widget _buildMessage(Map<String, String> msg) {
+    if (msg['role'] == 'product') {
+      return Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: ListTile(
+          title: Text(msg['name'] ?? ''),
+          subtitle: Text(
+            'Giá: ${msg['price']}\nTình trạng: ${msg['status']}\nDanh mục: ${msg['category']}\nNgười bán: ${msg['seller']}',
+          ),
+        ),
+      );
+    }
     final isUser = msg['role'] == 'user';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -164,7 +182,7 @@ class _AIScreenState extends State<AIScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat AI về sản phẩm')),
+      appBar: AppBar(title: const Text('Tìm kiếm sản phẩm')),
       body: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
@@ -181,7 +199,7 @@ class _AIScreenState extends State<AIScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: const InputDecoration(
-                      labelText: 'Nhập câu hỏi về sản phẩm...',
+                      labelText: 'Nhập tên sản phẩm cần tìm...',
                       border: OutlineInputBorder(),
                     ),
                     minLines: 1,
@@ -204,7 +222,7 @@ class _AIScreenState extends State<AIScreen> {
                               color: Colors.white,
                             ),
                           )
-                          : const Icon(Icons.send),
+                          : const Icon(Icons.search),
                 ),
               ],
             ),

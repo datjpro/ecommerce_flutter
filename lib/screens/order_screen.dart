@@ -69,8 +69,8 @@ class _OrderScreenState extends State<OrderScreen>
     try {
       final url =
           status == 'all'
-              ? 'http://localhost:4000/api/order/user/$userId'
-              : 'http://localhost:4000/api/order/user/$userId?status=$status';
+              ? 'http://10.0.2.2:4000/api/order/user/$userId'
+              : 'http://10.0.2.2:4000/api/order/user/$userId?status=$status';
 
       final response = await http.get(Uri.parse(url));
 
@@ -272,7 +272,7 @@ class _OrderScreenState extends State<OrderScreen>
                             try {
                               final detailRes = await http.get(
                                 Uri.parse(
-                                  'http://localhost:4001/api/orderDetails/order/$orderId',
+                                  'http://10.0.2.2:4001/api/orderDetails/order/$orderId',
                                 ),
                               );
 
@@ -562,7 +562,7 @@ class _OrderScreenState extends State<OrderScreen>
                                                               final response =
                                                                   await http.patch(
                                                                     Uri.parse(
-                                                                      'http://localhost:4000/api/order/cancel/$orderId',
+                                                                      'http://10.0.2.2:4000/api/order/cancel/$orderId',
                                                                     ),
                                                                     headers: {
                                                                       'Content-Type':

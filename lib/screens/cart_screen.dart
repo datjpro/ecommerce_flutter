@@ -35,7 +35,7 @@ Future<void> addToCart(Map product, int quantity, BuildContext context) async {
 
   try {
     final response = await http.post(
-      Uri.parse('http://localhost:3003/api/cart/create'),
+      Uri.parse('http://10.0.2.2:3003/api/cart/create'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'userId': userId,
@@ -132,7 +132,7 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3003/api/cart/user/$userId'),
+        Uri.parse('http://10.0.2.2:3003/api/cart/user/$userId'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -213,7 +213,7 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('http://localhost:3003/api/cart/updateCart/$cartItemId'),
+        Uri.parse('http://10.0.2.2:3003/api/cart/updateCart/$cartItemId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'quantity': newQuantity}),
       );
@@ -274,7 +274,7 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> handleDelete(String cartItemId, {bool reloadCart = true}) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://localhost:3003/api/cart/deleteCart/$cartItemId'),
+        Uri.parse('http://10.0.2.2:3003/api/cart/deleteCart/$cartItemId'),
         headers: {'Content-Type': 'application/json'},
       );
 

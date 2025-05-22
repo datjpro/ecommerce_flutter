@@ -278,6 +278,13 @@ class OrderDetailScreen extends StatelessWidget {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final detail = orderDetails[index];
+                  final product = detail['productId'] ?? {};
+                  final imageUrl =
+                      (product['image'] != null &&
+                              product['image'] is List &&
+                              product['image'].isNotEmpty)
+                          ? product['image'][0]
+                          : null;
                   return Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
@@ -291,11 +298,11 @@ class OrderDetailScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child:
-                              detail['imageUrl'] != null
+                              imageUrl != null
                                   ? ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: Image.network(
-                                      detail['imageUrl'],
+                                      imageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder:
                                           (_, __, ___) => Icon(
@@ -317,8 +324,8 @@ class OrderDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                detail['productName'] ??
-                                    'Sản phẩm: ${detail['productId'] ?? ''}',
+                                product['name'] ??
+                                    'Sản phẩm: ${product['_id'] ?? ''}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w500,
                                   fontSize: 14,
@@ -327,10 +334,13 @@ class OrderDetailScreen extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              if (detail['variant'] != null) ...[
+                              if (product['describe'] != null &&
+                                  product['describe']
+                                      .toString()
+                                      .isNotEmpty) ...[
                                 Text(
-                                  'Phân loại: ${detail['variant']}',
-                                  style: TextStyle(
+                                  product['describe'],
+                                  style: const TextStyle(
                                     fontSize: 13,
                                     color: Colors.black54,
                                   ),
@@ -340,7 +350,7 @@ class OrderDetailScreen extends StatelessWidget {
                               Row(
                                 children: [
                                   Text(
-                                    _formatCurrency(detail['price']),
+                                    _formatCurrency(product['price']),
                                     style: TextStyle(
                                       fontWeight: FontWeight.w500,
                                       fontSize: 14,
@@ -406,12 +416,17 @@ class OrderDetailScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildPaymentRow(
                     'Tổng tiền hàng:',
-                    _formatCurrency(order['subtotal'] ?? order['totalOrder']),
+                    _formatCurrency(
+                      order['subtotal'] ??
+                          ((order['totalOrder'] ?? 0) -
+                              ((order['transportId']?['fee'] ?? 0)) +
+                              (order['discount'] ?? 0)),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _buildPaymentRow(
                     'Phí vận chuyển:',
-                    _formatCurrency(order['shippingFee'] ?? 0),
+                    _formatCurrency(order['transportId']?['fee'] ?? 0),
                   ),
                   if (order['discount'] != null && order['discount'] != 0) ...[
                     const SizedBox(height: 12),
@@ -430,7 +445,12 @@ class OrderDetailScreen extends StatelessWidget {
                     isTotal: true,
                   ),
                   const SizedBox(height: 16),
-                  _buildPaymentMethodRow(order['paymentMethod'] ?? 'COD'),
+                  _buildPaymentMethodRow(
+                    (order['paymentId'] is Map &&
+                            order['paymentId']?['paymentMethod'] != null)
+                        ? order['paymentId']['paymentMethod']
+                        : (order['paymentMethod'] ?? 'cod'),
+                  ),
                 ],
               ),
             ),
@@ -552,7 +572,10 @@ class OrderDetailScreen extends StatelessWidget {
     IconData icon;
     String methodName;
 
-    switch (method.toLowerCase()) {
+    // Sửa lỗi chính tả phổ biến
+    final normalized = method.toLowerCase().replaceAll('mono', 'momo');
+
+    switch (normalized) {
       case 'credit_card':
       case 'card':
         icon = Icons.credit_card;
@@ -566,6 +589,10 @@ class OrderDetailScreen extends StatelessWidget {
       case 'banking':
         icon = Icons.account_balance;
         methodName = 'Chuyển khoản ngân hàng';
+        break;
+      case 'momo':
+        icon = Icons.account_balance_wallet;
+        methodName = 'Ví MoMo';
         break;
       case 'cod':
       default:

@@ -42,7 +42,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:4003/api/product/search?name=$keyword'),
+        Uri.parse('http://10.0.2.2:4003/api/product/search?name=$keyword'),
         headers: {'Content-Type': 'application/json'},
       );
 

@@ -43,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (userId != null) {
       try {
-        final url = 'http://localhost:4000/api/order/user/$userId';
+        final url = 'http://10.0.2.2:4000/api/order/user/$userId';
         final response = await http.get(Uri.parse(url));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);

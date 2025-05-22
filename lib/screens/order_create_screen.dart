@@ -26,15 +26,22 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
   String? userId;
   String? paymentId = "6821d8beac81a5ddf96daf0c"; // giả lập
-  String? transportId = "6821d8beac81a5ddf96daf0d"; // giả lập
+  String? transportId; // Không set mặc định nữa
+  String paymentMethod = "cod"; // Mặc địn  h là COD
 
   bool isLoading = false;
   bool isUserInfoLoading = true;
+
+  List<Map<String, dynamic>> paymentMethods = [];
+  List<Map<String, dynamic>> transportMethods = [];
+  int selectedTransportFee = 0;
 
   @override
   void initState() {
     super.initState();
     _loadUserIdAndInfo();
+    fetchPaymentMethods();
+    fetchTransportMethods(); // Gọi khi khởi tạo
   }
 
   Future<void> _loadUserIdAndInfo() async {
@@ -51,7 +58,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   Future<void> _fetchCustomerInfo(String userId) async {
     try {
       final url = Uri.parse(
-        'http://localhost:3002/api/customer/by-user/$userId',
+        'http://10.0.2.2:3002/api/customer/by-user/$userId',
       );
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -66,13 +73,108 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     }
   }
 
+  Future<void> fetchPaymentMethods() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3007/api/payment/all'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      // print('Payment API status: ${response.statusCode}');
+      // print('Payment API body: ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          // data là List
+          paymentMethods = List<Map<String, dynamic>>.from(data);
+          if (paymentMethods.isNotEmpty) {
+            paymentId = paymentMethods.first['_id'];
+          }
+        });
+      } else {
+        // Hiển thị lỗi cho người dùng
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi lấy phương thức thanh toán: ${response.body}'),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Payment API error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi lấy phương thức thanh toán: $e')),
+      );
+    }
+  }
+
+  // Sửa lại hàm fetchTransportMethods để tránh lỗi khi danh sách rỗng hoặc không có GHN
+  Future<void> fetchTransportMethods() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3005/api/transport/all'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          transportMethods = List<Map<String, dynamic>>.from(data);
+          // Mặc định là GHN nếu có, nếu không thì lấy cái đầu tiên, nếu không có thì null
+          Map<String, dynamic>? ghn;
+          if (transportMethods.isNotEmpty) {
+            try {
+              ghn = transportMethods.firstWhere(
+                (t) => t['shippingCarrier'] == 'GHN',
+                orElse: () => transportMethods.first,
+              );
+            } catch (e) {
+              ghn = null;
+            }
+          } else {
+            ghn = null;
+          }
+          if (ghn != null && ghn.containsKey('_id')) {
+            transportId = ghn['_id'];
+            selectedTransportFee = ghn['fee'] ?? 0;
+          } else {
+            transportId = null;
+            selectedTransportFee = 0;
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi lấy phương thức vận chuyển: ${response.body}'),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Transport API error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi lấy phương thức vận chuyển: $e')),
+      );
+    }
+  }
+
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate() || userId == null) return;
 
     setState(() => isLoading = true);
 
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
     final orderData = {
-      "totalOrder": widget.totalPrice,
+      "totalOrder": widget.totalPrice + selectedTransportFee, // Cộng phí ship
+      "shippingFee": selectedTransportFee, // <-- Thêm dòng này
       "status": "pending",
       "shippingInfo": {
         "name": _nameCtrl.text,
@@ -89,8 +191,11 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:4000/api/order/create'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('http://10.0.2.2:4000/api/order/create'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode(orderData),
       );
 
@@ -110,7 +215,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
               "totalPrice": (product['price'] * item['quantity']),
             };
             await http.post(
-              Uri.parse('http://localhost:4001/api/orderDetails/create'),
+              Uri.parse('http://10.0.2.2:4001/api/orderDetails/create'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(orderDetailData),
             );
@@ -221,9 +326,40 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Tổng thanh toán:'),
+                                    Text('Tổng tiền hàng:'),
                                     Text(
                                       'đ${widget.totalPrice.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Phí vận chuyển:'),
+                                    Text(
+                                      'đ${selectedTransportFee.toString()}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Divider(height: 24),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Tổng thanh toán:'),
+                                    Text(
+                                      'đ${(widget.totalPrice + selectedTransportFee).toStringAsFixed(0)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
@@ -397,34 +533,36 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                       vertical: 16,
                                     ),
                                   ),
-                                  items: [
-                                    DropdownMenuItem(
-                                      value: "6821d8beac81a5ddf96daf0c",
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.money,
-                                            color: Colors.green,
+                                  items:
+                                      paymentMethods.map((pm) {
+                                        final method =
+                                            pm['paymentMethod'] ?? '';
+                                        return DropdownMenuItem<String>(
+                                          value: pm['_id'],
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                method == 'cod'
+                                                    ? Icons.money
+                                                    : Icons
+                                                        .account_balance_wallet,
+                                                color:
+                                                    method == 'cod'
+                                                        ? Colors.green
+                                                        : Colors.purple,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                method == 'cod'
+                                                    ? 'Thanh toán khi nhận hàng'
+                                                    : (method == 'momo'
+                                                        ? 'Ví MoMo'
+                                                        : method.toString()),
+                                              ),
+                                            ],
                                           ),
-                                          SizedBox(width: 8),
-                                          Text('Thanh toán khi nhận hàng'),
-                                        ],
-                                      ),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "other",
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.credit_card,
-                                            color: Colors.blue,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('Khác (giả lập)'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                        );
+                                      }).toList(),
                                   onChanged:
                                       (v) => setState(() => paymentId = v),
                                 ),
@@ -457,36 +595,46 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                       vertical: 16,
                                     ),
                                   ),
-                                  items: [
-                                    DropdownMenuItem(
-                                      value: "6821d8beac81a5ddf96daf0d",
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.local_shipping,
-                                            color: Colors.orange,
+                                  items:
+                                      transportMethods.map((tm) {
+                                        return DropdownMenuItem<String>(
+                                          value: tm['_id'],
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.local_shipping,
+                                                color: Colors.orange,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                '${tm['shippingCarrier']} (đ${tm['fee']})',
+                                              ),
+                                            ],
                                           ),
-                                          SizedBox(width: 8),
-                                          Text('Giao hàng tiêu chuẩn'),
-                                        ],
-                                      ),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "other",
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.delivery_dining,
-                                            color: Colors.purple,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('Khác (giả lập)'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                  onChanged:
-                                      (v) => setState(() => transportId = v),
+                                        );
+                                      }).toList(),
+                                  onChanged: (v) {
+                                    setState(() {
+                                      transportId = v;
+                                      final selected = transportMethods
+                                          .firstWhere(
+                                            (tm) => tm['_id'] == v,
+                                            orElse: () => {},
+                                          );
+                                      if (selected is Map &&
+                                          selected.containsKey('fee')) {
+                                        selectedTransportFee =
+                                            selected['fee'] ?? 0;
+                                      } else {
+                                        selectedTransportFee = 0;
+                                      }
+                                    });
+                                  },
+                                  validator:
+                                      (v) =>
+                                          v == null || v.isEmpty
+                                              ? 'Chọn phương thức vận chuyển'
+                                              : null,
                                 ),
                               ],
                             ),
@@ -521,14 +669,12 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                 Divider(height: 24),
                                 ...widget.selectedItems.map((item) {
                                   final product = item['productId'];
-                                  // Safely extract the image URL, ensuring it's a string
                                   String? imageUrl;
                                   if (product['image'] != null) {
                                     if (product['image'] is String) {
                                       imageUrl = product['image'];
                                     } else if (product['image'] is List &&
                                         (product['image'] as List).isNotEmpty) {
-                                      // If image is a list, use the first item
                                       final firstImage =
                                           (product['image'] as List).first;
                                       imageUrl =
@@ -537,7 +683,6 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                               : null;
                                     }
                                   }
-
                                   return Card(
                                     elevation: 0,
                                     color: Colors.grey[100],

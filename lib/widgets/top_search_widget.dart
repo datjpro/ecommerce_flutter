@@ -21,7 +21,7 @@ class _TopSearchWidgetState extends State<TopSearchWidget> {
   Future<void> fetchTopProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:4003/api/product/all'),
+        Uri.parse('http://10.0.2.2:4003/api/product/all'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -30,19 +30,25 @@ class _TopSearchWidgetState extends State<TopSearchWidget> {
         allProducts.sort(
           (a, b) => (b['views'] ?? 0).compareTo(a['views'] ?? 0),
         );
-        setState(() {
-          products = allProducts.take(10).toList();
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            products = allProducts.take(10).toList();
+            isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 

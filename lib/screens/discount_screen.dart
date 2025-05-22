@@ -50,7 +50,7 @@ class _DiscountScreenState extends State<DiscountScreen> {
   }
 
   Future<List<Discount>> fetchDiscounts() async {
-    final url = Uri.parse('http://localhost:4002/api/discount/all');
+    final url = Uri.parse('http://10.0.2.2:4002/api/discount/all');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {

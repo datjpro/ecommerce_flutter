@@ -76,7 +76,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:4003/api/product/$id'),
+        Uri.parse('http://10.0.2.2:4003/api/product/$id'),
       );
 
       if (response.statusCode == 200) {
@@ -102,8 +102,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  void handleAddToCart() async {
-    if (product == null) return;
+  // Thay đổi hàm handleAddToCart để trả về true nếu đã đăng nhập, false nếu chưa đăng nhập
+  Future<bool> handleAddToCart() async {
+    if (product == null) return false;
     if (quantity <= 0 || quantity > product!['quantity']) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -119,32 +120,66 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
       );
-      return;
+      return false;
     }
-    await addToCart(product!, quantity, context);
 
-    // Show success animation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        backgroundColor: Colors.green.shade700,
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 8),
-            Text('Đã thêm vào giỏ hàng'),
-          ],
+    // Kiểm tra đăng nhập trước
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: Colors.red.shade800,
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Vui lòng đăng nhập để thêm vào giỏ hàng'),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'ĐĂNG NHẬP',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.pushNamed(context, '/login');
+            },
+          ),
         ),
-        action: SnackBarAction(
-          label: 'XEM GIỎ HÀNG',
-          textColor: Colors.white,
-          onPressed: () {
-            Navigator.pushNamed(context, '/cart');
-          },
+      );
+      return false;
+    }
+
+    // Nếu đã đăng nhập, tiến hành thêm vào giỏ hàng
+    bool success = await addToCart(product!, quantity, context);
+
+    // Chỉ hiển thị thông báo thành công nếu thực sự thành công
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: Colors.green.shade700,
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(child: Text('Đã thêm vào giỏ hàng')),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'XEM GIỎ HÀNG',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.pushNamed(context, '/cart');
+            },
+          ),
         ),
-      ),
-    );
+      );
+    }
+    return success;
   }
 
   String formatCurrency(dynamic price) {
@@ -168,9 +203,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         SizedBox(width: 4),
-        Text(
-          '($totalReviews đánh giá)',
-          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+        Flexible(
+          // Sửa từ Expanded thành Flexible
+          child: Text(
+            '($totalReviews đánh giá)',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         ),
       ],
     );
@@ -453,71 +493,86 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          product!['name'] ?? '',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            height: 1.3,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product?['name'] ??
+                                    '', // Thêm dấu ? để kiểm tra null
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 8),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          // Thay vì mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  formatCurrency(product!['price']),
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.bold,
+                            Expanded(
+                              // Thêm Expanded cho cột giá
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    formatCurrency(product!['price']),
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      color: Theme.of(context).primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                if (product!['discounted_price'] != null) ...[
-                                  SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        formatCurrency(
-                                          product!['discounted_price'],
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey,
-                                          decoration:
-                                              TextDecoration.lineThrough,
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
+                                  if (product!['discounted_price'] != null) ...[
+                                    SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          formatCurrency(
+                                            product!['discounted_price'],
                                           ),
-                                        ),
-                                        child: Text(
-                                          '-20%',
                                           style: TextStyle(
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
+                                            fontSize: 16,
+                                            color: Colors.grey,
+                                            decoration:
+                                                TextDecoration.lineThrough,
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                        SizedBox(width: 8),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '-20%',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                            _buildRatingBar(4.5, totalReviews: 120),
+                            // Bao widget đánh giá trong một container có chiều rộng cố định
+                            Container(
+                              width: 140, // Giới hạn chiều rộng
+                              child: _buildRatingBar(4.5, totalReviews: 120),
+                            ),
                           ],
                         ),
                       ],
@@ -759,232 +814,245 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // Tab content
                         Container(
                           padding: EdgeInsets.all(16),
-                          child:
-                              [
-                                // Product description tab
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Mô tả sản phẩm',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    Text(
-                                      product!['description'] ??
-                                          'Không có mô tả sản phẩm',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: Colors.grey.shade800,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                    SizedBox(height: 20),
-                                    Text(
-                                      'Thông số kỹ thuật',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    SizedBox(height: 12),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey.shade300,
+                          child: SingleChildScrollView(
+                            child:
+                                [
+                                  // Product description tab
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Mô tả sản phẩm',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: Column(
+                                      SizedBox(height: 16),
+                                      Text(
+                                        product!['description'] ??
+                                            'Không có mô tả sản phẩm',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.grey.shade800,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                      SizedBox(height: 20),
+                                      Text(
+                                        'Thông số kỹ thuật',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            _buildSpecRow(
+                                              'Thương hiệu',
+                                              'Brand XYZ',
+                                              true,
+                                            ),
+                                            _buildSpecRow(
+                                              'Xuất xứ',
+                                              'Việt Nam',
+                                              false,
+                                            ),
+                                            _buildSpecRow(
+                                              'Chất liệu',
+                                              'Premium',
+                                              true,
+                                            ),
+                                            _buildSpecRow(
+                                              'Kích thước',
+                                              'Standard',
+                                              false,
+                                            ),
+                                            _buildSpecRow(
+                                              'Bảo hành',
+                                              '12 tháng',
+                                              true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // Reviews tab
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          _buildSpecRow(
-                                            'Thương hiệu',
-                                            'Brand XYZ',
-                                            true,
+                                          Text(
+                                            'Đánh giá sản phẩm',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                          _buildSpecRow(
-                                            'Xuất xứ',
-                                            'Việt Nam',
-                                            false,
-                                          ),
-                                          _buildSpecRow(
-                                            'Chất liệu',
-                                            'Premium',
-                                            true,
-                                          ),
-                                          _buildSpecRow(
-                                            'Kích thước',
-                                            'Standard',
-                                            false,
-                                          ),
-                                          _buildSpecRow(
-                                            'Bảo hành',
-                                            '12 tháng',
-                                            true,
+                                          TextButton.icon(
+                                            onPressed: () {},
+                                            icon: Icon(Icons.rate_review),
+                                            label: Text('Viết đánh giá'),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  Theme.of(
+                                                    context,
+                                                  ).primaryColor,
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                // Reviews tab
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Đánh giá sản phẩm',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
+                                      SizedBox(height: 16),
+                                      Container(
+                                        padding: EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade200,
                                           ),
                                         ),
-                                        TextButton.icon(
-                                          onPressed: () {},
-                                          icon: Icon(Icons.rate_review),
-                                          label: Text('Viết đánh giá'),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor:
-                                                Theme.of(context).primaryColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 16),
-                                    Container(
-                                      padding: EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade50,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.grey.shade200,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Text(
-                                                '4.5',
-                                                style: TextStyle(
-                                                  fontSize: 32,
-                                                  fontWeight: FontWeight.bold,
+                                        child: Column(
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '4.5',
+                                                  style: TextStyle(
+                                                    fontSize: 32,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
-                                              ),
-                                              SizedBox(width: 12),
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: List.generate(
-                                                      5,
-                                                      (index) => Icon(
-                                                        index < 4.5
-                                                            ? Icons.star
-                                                            : Icons.star_half,
-                                                        color: Colors.amber,
-                                                        size: 24,
+                                                SizedBox(width: 12),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: List.generate(
+                                                        5,
+                                                        (index) => Icon(
+                                                          index < 4.5
+                                                              ? Icons.star
+                                                              : Icons.star_half,
+                                                          color: Colors.amber,
+                                                          size: 24,
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  SizedBox(height: 4),
-                                                  Text(
-                                                    '120 đánh giá',
-                                                    style: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade600,
+                                                    SizedBox(height: 4),
+                                                    Text(
+                                                      '120 đánh giá',
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors
+                                                                .grey
+                                                                .shade600,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(height: 16),
-                                          _buildRatingBar2(
-                                            5,
-                                            82,
-                                            'Rất hài lòng',
-                                          ),
-                                          _buildRatingBar2(4, 24, 'Hài lòng'),
-                                          _buildRatingBar2(
-                                            3,
-                                            10,
-                                            'Bình thường',
-                                          ),
-                                          _buildRatingBar2(
-                                            2,
-                                            3,
-                                            'Không hài lòng',
-                                          ),
-                                          _buildRatingBar2(
-                                            1,
-                                            1,
-                                            'Rất không hài lòng',
-                                          ),
-                                        ],
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(height: 16),
+                                            _buildRatingBar2(
+                                              5,
+                                              82,
+                                              'Rất hài lòng',
+                                            ),
+                                            _buildRatingBar2(4, 24, 'Hài lòng'),
+                                            _buildRatingBar2(
+                                              3,
+                                              10,
+                                              'Bình thường',
+                                            ),
+                                            _buildRatingBar2(
+                                              2,
+                                              3,
+                                              'Không hài lòng',
+                                            ),
+                                            _buildRatingBar2(
+                                              1,
+                                              1,
+                                              'Rất không hài lòng',
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    // Sample reviews
-                                    _buildReviewItem(
-                                      name: 'Nguyễn Văn A',
-                                      rating: 5,
-                                      date: '12/05/2025',
-                                      comment:
-                                          'Sản phẩm rất tốt, đóng gói cẩn thận, giao hàng nhanh. Tôi rất hài lòng với sản phẩm này!',
-                                    ),
-                                    Divider(),
-                                    _buildReviewItem(
-                                      name: 'Trần Thị B',
-                                      rating: 4,
-                                      date: '10/05/2025',
-                                      comment:
-                                          'Sản phẩm đẹp, chất lượng tốt. Giao hàng hơi lâu nhưng vẫn ổn.',
-                                    ),
-                                  ],
-                                ),
-                                // Policies tab
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Chính sách mua hàng',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
+                                      SizedBox(height: 16),
+                                      // Sample reviews
+                                      _buildReviewItem(
+                                        name: 'Nguyễn Văn A',
+                                        rating: 5,
+                                        date: '12/05/2025',
+                                        comment:
+                                            'Sản phẩm rất tốt, đóng gói cẩn thận, giao hàng nhanh. Tôi rất hài lòng với sản phẩm này!',
                                       ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    _buildPolicyItem(
-                                      Icons.local_shipping,
-                                      'Chính sách vận chuyển',
-                                      'Miễn phí vận chuyển cho đơn hàng từ 300,000đ. Phí vận chuyển 30,000đ cho đơn hàng dưới 300,000đ.',
-                                    ),
-                                    _buildPolicyItem(
-                                      Icons.assignment_return,
-                                      'Chính sách đổi trả',
-                                      'Được đổi trả trong vòng 7 ngày kể từ ngày nhận hàng nếu sản phẩm còn nguyên vẹn, có hóa đơn và tem mác đầy đủ.',
-                                    ),
-                                    _buildPolicyItem(
-                                      Icons.security,
-                                      'Chính sách bảo hành',
-                                      'Bảo hành chính hãng 12 tháng theo tiêu chuẩn nhà sản xuất.',
-                                    ),
-                                    _buildPolicyItem(
-                                      Icons.payment,
-                                      'Phương thức thanh toán',
-                                      'Hỗ trợ thanh toán qua thẻ tín dụng, chuyển khoản ngân hàng, ví điện tử và thanh toán khi nhận hàng (COD).',
-                                    ),
-                                  ],
-                                ),
-                              ][_selectedTab],
+                                      Divider(),
+                                      _buildReviewItem(
+                                        name: 'Trần Thị B',
+                                        rating: 4,
+                                        date: '10/05/2025',
+                                        comment:
+                                            'Sản phẩm đẹp, chất lượng tốt. Giao hàng hơi lâu nhưng vẫn ổn.',
+                                      ),
+                                    ],
+                                  ),
+                                  // Policies tab
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Chính sách mua hàng',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      _buildPolicyItem(
+                                        Icons.local_shipping,
+                                        'Chính sách vận chuyển',
+                                        'Miễn phí vận chuyển cho đơn hàng từ 300,000đ. Phí vận chuyển 30,000đ cho đơn hàng dưới 300,000đ.',
+                                      ),
+                                      _buildPolicyItem(
+                                        Icons.assignment_return,
+                                        'Chính sách đổi trả',
+                                        'Được đổi trả trong vòng 7 ngày kể từ ngày nhận hàng nếu sản phẩm còn nguyên vẹn, có hóa đơn và tem mác đầy đủ.',
+                                      ),
+                                      _buildPolicyItem(
+                                        Icons.security,
+                                        'Chính sách bảo hành',
+                                        'Bảo hành chính hãng 12 tháng theo tiêu chuẩn nhà sản xuất.',
+                                      ),
+                                      _buildPolicyItem(
+                                        Icons.payment,
+                                        'Phương thức thanh toán',
+                                        'Hỗ trợ thanh toán qua thẻ tín dụng, chuyển khoản ngân hàng, ví điện tử và thanh toán khi nhận hàng (COD).',
+                                      ),
+                                    ],
+                                  ),
+                                ][_selectedTab],
+                          ),
                         ),
                       ],
                     ),
@@ -1070,7 +1138,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // Add to cart button
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: handleAddToCart,
+                onPressed: () async {
+                  await handleAddToCart();
+                },
                 icon: Icon(Icons.shopping_cart_outlined),
                 label: Text('THÊM VÀO GIỎ HÀNG'),
                 style: ElevatedButton.styleFrom(
@@ -1088,10 +1158,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // Buy now button
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  // First add to cart, then navigate to checkout
-                  handleAddToCart();
-                  Navigator.pushNamed(context, '/checkout');
+                onPressed: () async {
+                  bool loggedIn = await handleAddToCart();
+                  if (loggedIn) {
+                    Navigator.pushNamed(context, '/checkout');
+                  }
+                  // Nếu chưa đăng nhập, chỉ hiện thông báo, không chuyển trang
                 },
                 child: Text('MUA NGAY'),
                 style: ElevatedButton.styleFrom(
@@ -1297,6 +1369,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Icon(icon, color: Theme.of(context).primaryColor, size: 24),
           SizedBox(width: 16),
           Expanded(
+            // Đảm bảo thêm Expanded cho text có thể dài
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1409,7 +1482,7 @@ class _EnhancedOtherProductsWidgetState
   Future<void> fetchProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:4003/api/product/all'),
+        Uri.parse('http://10.0.2.2:4003/api/product/all'),
       );
 
       if (response.statusCode == 200) {
@@ -1474,7 +1547,7 @@ class _EnhancedOtherProductsWidgetState
     }
 
     return Container(
-      height: 320,
+      height: 320, // Kích thước cố định là tốt
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: products.length > 6 ? 6 : products.length,
@@ -1579,14 +1652,20 @@ class _EnhancedOtherProductsWidgetState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          product['name'] ?? '',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product['name'] ?? '',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 4),
                         Row(
@@ -1632,7 +1711,7 @@ class _EnhancedOtherProductsWidgetState
   }
 }
 
-Future<void> addToCart(
+Future<bool> addToCart(
   Map<String, dynamic> product,
   int quantity,
   BuildContext context,
@@ -1641,32 +1720,12 @@ Future<void> addToCart(
   final userId = prefs.getString('userId');
 
   if (userId == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.white),
-            SizedBox(width: 8),
-            Text('Bạn cần đăng nhập để thêm vào giỏ hàng'),
-          ],
-        ),
-        backgroundColor: Colors.red.shade700,
-        action: SnackBarAction(
-          label: 'ĐĂNG NHẬP',
-          textColor: Colors.white,
-          onPressed: () {
-            Navigator.pushNamed(context, '/login');
-          },
-        ),
-      ),
-    );
-    return;
+    return false;
   }
 
   try {
     final response = await http.post(
-      Uri.parse('http://localhost:3003/api/cart/create'),
+      Uri.parse('http://10.0.2.2:3003/api/cart/create'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'userId': userId,
@@ -1676,7 +1735,7 @@ Future<void> addToCart(
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      // Success, no need to do anything extra as the calling function shows a snackbar
+      return true;
     } else {
       print('Failed to add to cart: ${response.body}');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1692,6 +1751,7 @@ Future<void> addToCart(
           backgroundColor: Colors.red.shade700,
         ),
       );
+      return false;
     }
   } catch (error) {
     print('Error adding to cart: $error');
@@ -1708,5 +1768,6 @@ Future<void> addToCart(
         backgroundColor: Colors.red.shade700,
       ),
     );
+    return false;
   }
 }
