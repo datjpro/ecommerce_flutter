@@ -69,8 +69,8 @@ class _OrderScreenState extends State<OrderScreen>
     try {
       final url =
           status == 'all'
-              ? 'http://10.0.2.2:4000/api/order/user/$userId'
-              : 'http://10.0.2.2:4000/api/order/user/$userId?status=$status';
+              ? 'http://localhost:4000/api/order/user/$userId'
+              : 'http://localhost:4000/api/order/user/$userId?status=$status';
 
       final response = await http.get(Uri.parse(url));
 
@@ -269,49 +269,20 @@ class _OrderScreenState extends State<OrderScreen>
                           borderRadius: BorderRadius.circular(12),
                           onTap: () async {
                             final orderId = order['_id'];
-                            try {
-                              final detailRes = await http.get(
-                                Uri.parse(
-                                  'http://10.0.2.2:4001/api/orderDetails/order/$orderId',
-                                ),
-                              );
 
-                              if (detailRes.statusCode == 200) {
-                                final data = json.decode(detailRes.body);
-                                final orderDetails = data is List ? data : [];
+                            if (!mounted) return;
 
-                                if (!mounted) return;
-
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => OrderDetailScreen(
-                                          orderDetails: orderDetails,
-                                          order: order,
-                                        ),
-                                  ),
-                                );
-                              } else {
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Không lấy được chi tiết đơn hàng',
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => OrderDetailScreen(
+                                      orderId:
+                                          orderId, // Truyền orderId thay vì orderDetails
+                                      order: order, // Giữ nguyên order
                                     ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Lỗi kết nối: $e'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
+                              ),
+                            );
                           },
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,7 +533,7 @@ class _OrderScreenState extends State<OrderScreen>
                                                               final response =
                                                                   await http.patch(
                                                                     Uri.parse(
-                                                                      'http://10.0.2.2:4000/api/order/cancel/$orderId',
+                                                                      'http://localhost:4000/api/order/cancel/$orderId',
                                                                     ),
                                                                     headers: {
                                                                       'Content-Type':

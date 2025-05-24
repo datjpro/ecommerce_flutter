@@ -54,7 +54,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
     });
 
     final url = Uri.parse(
-      'http://10.0.2.2:4003/api/product/by-category/${widget.categoryId}',
+      'http://localhost:4003/api/product/by-category/${widget.categoryId}',
     );
     try {
       final response = await http.get(url);

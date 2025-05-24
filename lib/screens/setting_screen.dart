@@ -62,7 +62,7 @@ class _SettingScreenState extends State<SettingScreen> {
       }
 
       final url = Uri.parse(
-        'http://10.0.2.2:3002/api/customer/by-user/$userId',
+        'http://localhost:3002/api/customer/by-user/$userId',
       );
       final response = await http.get(url);
 
@@ -100,7 +100,7 @@ class _SettingScreenState extends State<SettingScreen> {
     });
 
     final url = Uri.parse(
-      'http://10.0.2.2:3002/api/customer/update-by-user/$userId',
+      'http://localhost:3002/api/customer/update-by-user/$userId',
     );
     final body = json.encode({
       "fullName": fullNameController.text,

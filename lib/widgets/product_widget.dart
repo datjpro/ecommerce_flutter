@@ -20,7 +20,7 @@ class _ProductWidgetState extends State<ProductWidget> {
   Future<void> fetchProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4003/api/product/all'),
+        Uri.parse('http://localhost:4003/api/product/all'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

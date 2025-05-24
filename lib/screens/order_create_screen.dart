@@ -58,7 +58,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   Future<void> _fetchCustomerInfo(String userId) async {
     try {
       final url = Uri.parse(
-        'http://10.0.2.2:3002/api/customer/by-user/$userId',
+        'http://localhost:3002/api/customer/by-user/$userId',
       );
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -78,7 +78,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3007/api/payment/all'),
+        Uri.parse('http://localhost:3007/api/payment/all'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3005/api/transport/all'),
+        Uri.parse('http://localhost:3005/api/transport/all'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -172,9 +172,24 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
+    // Tạo orderDetailsItems từ selectedItems
+    List<Map<String, dynamic>> orderDetailsItems =
+        widget.selectedItems.map((item) {
+          final product = item['productId'];
+          return {
+            "productId": product['_id'] ?? product['id'],
+            "sellerId":
+                product['sellerId'] ??
+                product['seller_id'] ??
+                "", // Lấy sellerId từ product
+            "quantity": item['quantity'],
+            "totalPrice": (product['price'] * item['quantity']),
+          };
+        }).toList();
+
     final orderData = {
       "totalOrder": widget.totalPrice + selectedTransportFee, // Cộng phí ship
-      "shippingFee": selectedTransportFee, // <-- Thêm dòng này
+      "shippingFee": selectedTransportFee,
       "status": "pending",
       "shippingInfo": {
         "name": _nameCtrl.text,
@@ -187,11 +202,13 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       "paymentId": paymentId,
       "transportId": transportId,
       "userId": userId,
+      "orderDetailsItems":
+          orderDetailsItems, // Thêm orderDetailsItems vào orderData
     };
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:4000/api/order/create'),
+        Uri.parse('http://localhost:4000/api/order/create'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -203,25 +220,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        final orderId = data['order']?['_id'] ?? data['orderId'] ?? data['_id'];
-        // Tạo chi tiết đơn hàng cho từng sản phẩm
-        if (orderId != null) {
-          for (var item in widget.selectedItems) {
-            final product = item['productId'];
-            final orderDetailData = {
-              "orderId": orderId,
-              "productId": product['_id'] ?? product['id'],
-              "quantity": item['quantity'],
-              "totalPrice": (product['price'] * item['quantity']),
-            };
-            await http.post(
-              Uri.parse('http://10.0.2.2:4001/api/orderDetails/create'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode(orderDetailData),
-            );
-          }
-        }
-        // Hiển thị dialog thông báo thành công, chỉ cần click ra ngoài để đóng
+
+        // Không cần tạo orderDetails riêng nữa vì đã gửi trong orderDetailsItems
+        // Hiển thị dialog thông báo thành công
         showDialog(
           context: context,
           barrierDismissible: true,
@@ -229,10 +230,17 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
               (context) => AlertDialog(
                 title: const Text('Thành công'),
                 content: Text(data['message'] ?? 'Đặt hàng thành công!'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Đóng dialog
+                      Navigator.of(context).pop(); // Quay lại màn hình trước
+                    },
+                    child: Text('OK'),
+                  ),
+                ],
               ),
-        ).then((_) {
-          Navigator.of(context).pop();
-        });
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Lỗi đặt hàng: ${response.body}')),

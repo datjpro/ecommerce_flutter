@@ -76,7 +76,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4003/api/product/$id'),
+        Uri.parse('http://localhost:4003/api/product/$id'),
       );
 
       if (response.statusCode == 200) {
@@ -1482,7 +1482,7 @@ class _EnhancedOtherProductsWidgetState
   Future<void> fetchProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:4003/api/product/all'),
+        Uri.parse('http://localhost:4003/api/product/all'),
       );
 
       if (response.statusCode == 200) {
@@ -1725,7 +1725,7 @@ Future<bool> addToCart(
 
   try {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:3003/api/cart/create'),
+      Uri.parse('http://localhost:3003/api/cart/create'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'userId': userId,
