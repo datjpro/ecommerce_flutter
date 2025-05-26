@@ -19,16 +19,22 @@ class _OrderScreenState extends State<OrderScreen>
   late TabController _tabController;
   final List<String> _tabs = [
     'Tất cả',
-    'Chờ xác nhận',
+    'Chờ xử lý',
+    'Đã xác nhận',
+    'Đang chuẩn bị',
     'Đang giao',
     'Đã giao',
+    'Hoàn thành',
     'Đã hủy',
   ];
   final Map<String, String> _statusMapping = {
     'Tất cả': 'all',
-    'Chờ xác nhận': 'pending',
+    'Chờ xử lý': 'pending',
+    'Đã xác nhận': 'confirmed',
+    'Đang chuẩn bị': 'preparing',
     'Đang giao': 'shipping',
     'Đã giao': 'delivered',
+    'Hoàn thành': 'completed',
     'Đã hủy': 'cancelled',
   };
   final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
@@ -126,10 +132,16 @@ class _OrderScreenState extends State<OrderScreen>
     switch (status) {
       case 'pending':
         return Colors.orange;
-      case 'shipping':
+      case 'confirmed':
         return Colors.blue;
+      case 'preparing':
+        return Colors.indigo;
+      case 'shipping':
+        return Colors.purple;
       case 'delivered':
         return Colors.green;
+      case 'completed':
+        return Colors.teal;
       case 'cancelled':
         return Colors.red;
       default:
@@ -140,11 +152,17 @@ class _OrderScreenState extends State<OrderScreen>
   String translateStatus(String? status) {
     switch (status) {
       case 'pending':
-        return 'Chờ xác nhận';
+        return 'Chờ xử lý';
+      case 'confirmed':
+        return 'Đã xác nhận';
+      case 'preparing':
+        return 'Đang chuẩn bị';
       case 'shipping':
         return 'Đang giao';
       case 'delivered':
         return 'Đã giao';
+      case 'completed':
+        return 'Hoàn thành';
       case 'cancelled':
         return 'Đã hủy';
       default:
@@ -197,7 +215,7 @@ class _OrderScreenState extends State<OrderScreen>
 
   @override
   Widget build(BuildContext context) {
-    final scaffoldContext = context; // Lưu lại context của Scaffold
+    final scaffoldContext = context;
 
     return Scaffold(
       appBar: AppBar(
@@ -277,9 +295,8 @@ class _OrderScreenState extends State<OrderScreen>
                               MaterialPageRoute(
                                 builder:
                                     (context) => OrderDetailScreen(
-                                      orderId:
-                                          orderId, // Truyền orderId thay vì orderDetails
-                                      order: order, // Giữ nguyên order
+                                      orderId: orderId,
+                                      order: order,
                                     ),
                               ),
                             );
@@ -484,148 +501,11 @@ class _OrderScreenState extends State<OrderScreen>
                               ),
 
                               // Action buttons section
-                              if (status == 'pending' || status == 'shipping')
-                                Container(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    0,
-                                    16,
-                                    16,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      if (status == 'pending')
-                                        Expanded(
-                                          child: OutlinedButton(
-                                            onPressed: () {
-                                              showDialog(
-                                                context: context,
-                                                builder:
-                                                    (context) => AlertDialog(
-                                                      title: const Text(
-                                                        'Hủy đơn hàng',
-                                                      ),
-                                                      content: const Text(
-                                                        'Bạn có chắc muốn hủy đơn hàng này không?',
-                                                      ),
-                                                      actions: [
-                                                        TextButton(
-                                                          child: const Text(
-                                                            'Không',
-                                                          ),
-                                                          onPressed:
-                                                              () =>
-                                                                  Navigator.of(
-                                                                    context,
-                                                                  ).pop(),
-                                                        ),
-                                                        TextButton(
-                                                          child: const Text(
-                                                            'Có',
-                                                          ),
-                                                          onPressed: () async {
-                                                            Navigator.of(
-                                                              context,
-                                                            ).pop();
-                                                            final orderId =
-                                                                order['_id'];
-                                                            try {
-                                                              final response =
-                                                                  await http.patch(
-                                                                    Uri.parse(
-                                                                      'http://localhost:4000/api/order/cancel/$orderId',
-                                                                    ),
-                                                                    headers: {
-                                                                      'Content-Type':
-                                                                          'application/json',
-                                                                    },
-                                                                  );
-                                                              if (!mounted)
-                                                                return;
-                                                              if (response.statusCode ==
-                                                                      200 ||
-                                                                  response.statusCode ==
-                                                                      204) {
-                                                                ScaffoldMessenger.of(
-                                                                  scaffoldContext,
-                                                                ).showSnackBar(
-                                                                  const SnackBar(
-                                                                    content: Text(
-                                                                      'Đã hủy đơn hàng thành công!',
-                                                                    ),
-                                                                  ),
-                                                                );
-                                                                fetchOrders(
-                                                                  _statusMapping[_tabs[_tabController
-                                                                          .index]] ??
-                                                                      'all',
-                                                                );
-                                                              } else {
-                                                                ScaffoldMessenger.of(
-                                                                  scaffoldContext,
-                                                                ).showSnackBar(
-                                                                  SnackBar(
-                                                                    content: Text(
-                                                                      'Hủy đơn hàng thất bại: ${response.body}',
-                                                                    ),
-                                                                  ),
-                                                                );
-                                                              }
-                                                            } catch (e) {
-                                                              ScaffoldMessenger.of(
-                                                                scaffoldContext,
-                                                              ).showSnackBar(
-                                                                SnackBar(
-                                                                  content: Text(
-                                                                    'Lỗi kết nối: $e',
-                                                                  ),
-                                                                ),
-                                                              );
-                                                            }
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
-                                              );
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.red,
-                                              side: const BorderSide(
-                                                color: Colors.red,
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 10,
-                                                  ),
-                                            ),
-                                            child: const Text('Hủy đơn'),
-                                          ),
-                                        ),
-                                      if (status == 'shipping')
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              // Confirm received logic
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  Theme.of(
-                                                    context,
-                                                  ).primaryColor,
-                                              foregroundColor: Colors.white,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 10,
-                                                  ),
-                                            ),
-                                            child: const Text(
-                                              'Đã nhận được hàng',
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
+                              _buildActionButtons(
+                                status,
+                                order,
+                                scaffoldContext,
+                              ),
                             ],
                           ),
                         ),
@@ -634,6 +514,284 @@ class _OrderScreenState extends State<OrderScreen>
                   },
                 ),
       ),
+    );
+  }
+
+  Widget _buildActionButtons(
+    String status,
+    Map<String, dynamic> order,
+    BuildContext scaffoldContext,
+  ) {
+    List<Widget> buttons = [];
+
+    switch (status) {
+      case 'pending':
+        buttons.add(
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _cancelOrder(order, scaffoldContext),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('Hủy đơn'),
+            ),
+          ),
+        );
+        break;
+
+      case 'confirmed':
+      case 'preparing':
+        // Có thể thêm nút "Liên hệ seller" hoặc không có nút nào
+        break;
+
+      case 'shipping':
+        buttons.add(
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _confirmReceived(order, scaffoldContext),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('Đã nhận được hàng'),
+            ),
+          ),
+        );
+        break;
+
+      case 'delivered':
+        buttons.add(
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _completeOrder(order, scaffoldContext),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+                side: BorderSide(color: Theme.of(context).primaryColor),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('Hoàn thành đơn hàng'),
+            ),
+          ),
+        );
+        break;
+
+      case 'completed':
+        buttons.add(
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () {
+                // Logic đánh giá sản phẩm
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Tính năng đánh giá đang phát triển'),
+                  ),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+                side: BorderSide(color: Theme.of(context).primaryColor),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('Đánh giá'),
+            ),
+          ),
+        );
+        break;
+
+      case 'cancelled':
+        // Không có nút nào cho đơn hàng đã hủy
+        break;
+    }
+
+    if (buttons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Row(children: buttons),
+    );
+  }
+
+  Future<void> _cancelOrder(
+    Map<String, dynamic> order,
+    BuildContext scaffoldContext,
+  ) async {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Hủy đơn hàng'),
+            content: const Text('Bạn có chắc muốn hủy đơn hàng này không?'),
+            actions: [
+              TextButton(
+                child: const Text('Không'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              TextButton(
+                child: const Text('Có'),
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final orderId = order['_id'];
+                  try {
+                    final response = await http.patch(
+                      Uri.parse(
+                        'http://localhost:4000/api/order/cancel/$orderId',
+                      ),
+                      headers: {'Content-Type': 'application/json'},
+                    );
+                    if (!mounted) return;
+                    if (response.statusCode == 200 ||
+                        response.statusCode == 204) {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã hủy đơn hàng thành công!'),
+                        ),
+                      );
+                      fetchOrders(
+                        _statusMapping[_tabs[_tabController.index]] ?? 'all',
+                      );
+                    } else {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Hủy đơn hàng thất bại: ${response.body}',
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      scaffoldContext,
+                    ).showSnackBar(SnackBar(content: Text('Lỗi kết nối: $e')));
+                  }
+                },
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _confirmReceived(
+    Map<String, dynamic> order,
+    BuildContext scaffoldContext,
+  ) async {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Xác nhận nhận hàng'),
+            content: const Text(
+              'Bạn đã nhận được hàng và hài lòng với đơn hàng này?',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Chưa nhận'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              TextButton(
+                child: const Text('Đã nhận'),
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final orderId = order['_id'];
+                  try {
+                    final response = await http.patch(
+                      Uri.parse(
+                        'http://localhost:4000/api/order/delivered/$orderId',
+                      ),
+                      headers: {'Content-Type': 'application/json'},
+                    );
+                    if (!mounted) return;
+                    if (response.statusCode == 200 ||
+                        response.statusCode == 204) {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã xác nhận nhận hàng thành công!'),
+                        ),
+                      );
+                      fetchOrders(
+                        _statusMapping[_tabs[_tabController.index]] ?? 'all',
+                      );
+                    } else {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Xác nhận thất bại: ${response.body}'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      scaffoldContext,
+                    ).showSnackBar(SnackBar(content: Text('Lỗi kết nối: $e')));
+                  }
+                },
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _completeOrder(
+    Map<String, dynamic> order,
+    BuildContext scaffoldContext,
+  ) async {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Hoàn thành đơn hàng'),
+            content: const Text(
+              'Bạn có muốn đánh dấu đơn hàng này là hoàn thành không?',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Hủy'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              TextButton(
+                child: const Text('Hoàn thành'),
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final orderId = order['_id'];
+                  try {
+                    final response = await http.patch(
+                      Uri.parse(
+                        'http://localhost:4000/api/order/complete/$orderId',
+                      ),
+                      headers: {'Content-Type': 'application/json'},
+                    );
+                    if (!mounted) return;
+                    if (response.statusCode == 200 ||
+                        response.statusCode == 204) {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã hoàn thành đơn hàng thành công!'),
+                        ),
+                      );
+                      fetchOrders(
+                        _statusMapping[_tabs[_tabController.index]] ?? 'all',
+                      );
+                    } else {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Hoàn thành thất bại: ${response.body}',
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      scaffoldContext,
+                    ).showSnackBar(SnackBar(content: Text('Lỗi kết nối: $e')));
+                  }
+                },
+              ),
+            ],
+          ),
     );
   }
 }

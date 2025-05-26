@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<dynamic> orderDetails = [];
   Map<String, dynamic> sellerInfo = {};
+  Map<String, dynamic> productDetails =
+      {}; // Thêm map để lưu thông tin sản phẩm
   bool isLoading = true;
   String? error;
 
@@ -43,8 +46,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       );
 
+      // print('Response status: ${response.statusCode}');
+      // print('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final List<dynamic> details = json.decode(response.body);
+
+        // Debug: In ra dữ liệu để kiểm tra
+        // print('Order details count: ${details.length}');
+        // for (int i = 0; i < details.length; i++) {
+        //   print('Detail $i: ${details[i]}');
+        // }
+
+        // Lấy thông tin sản phẩm cho từng detail
+        for (var detail in details) {
+          final productId = detail['productId'];
+          if (productId != null) {
+            await fetchProductInfo(productId);
+          }
+        }
 
         // Lấy thông tin seller nếu có
         if (details.isNotEmpty) {
@@ -65,10 +85,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         });
       }
     } catch (e) {
+      print('Error in fetchOrderDetails: $e');
       setState(() {
         error = 'Lỗi kết nối: $e';
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> fetchProductInfo(String productId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:4003/api/product/$productId'),
+      );
+
+      // print('Product API response status: ${response.statusCode}');
+      // print('Product API response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final productData = json.decode(response.body);
+        setState(() {
+          productDetails[productId] = productData;
+        });
+      }
+    } catch (e) {
+      // print('Error fetching product info: $e');
     }
   }
 
@@ -83,19 +124,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           sellerInfo = json.decode(response.body);
         });
       }
-    } catch (e) {
-      print('Error fetching seller info: $e');
-    }
+    } catch (e) {}
   }
 
   String _formatCurrency(dynamic value) {
     if (value == null) return '0đ';
+
+    double numValue = 0;
+
+    if (value is num) {
+      numValue = value.toDouble();
+    } else if (value is String) {
+      numValue = double.tryParse(value) ?? 0;
+    } else {
+      // Thử chuyển đổi toString rồi parse
+      numValue = double.tryParse(value.toString()) ?? 0;
+    }
+
     final formatter = NumberFormat.currency(
       locale: 'vi_VN',
       symbol: 'đ',
       decimalDigits: 0,
     );
-    return formatter.format(value is String ? int.tryParse(value) ?? 0 : value);
+
+    return formatter.format(numValue);
   }
 
   String _formatDate(String? dateString) {
@@ -111,8 +163,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   String _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
-      case 'delivered':
       case 'hoàn thành':
+        return '009688'; // Teal
+      case 'delivered':
+      case 'đã giao':
         return '4CAF50'; // Green
       case 'processing':
       case 'đang xử lý':
@@ -120,6 +174,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'pending':
       case 'chờ xử lý':
         return 'FFC107'; // Amber
+      case 'confirmed':
+      case 'đã xác nhận':
+        return '2196F3'; // Blue
+      case 'preparing':
+      case 'đang chuẩn bị':
+        return '3F51B5'; // Indigo
+      case 'shipping':
+      case 'đang giao':
+        return '9C27B0'; // Purple
       case 'cancelled':
       case 'đã hủy':
         return 'F44336'; // Red
@@ -418,6 +481,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildProductItems() {
+    if (orderDetails.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.shopping_bag_outlined,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Không có sản phẩm nào',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -438,13 +535,50 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final detail = orderDetails[index];
-          final product = detail['productId'] ?? {};
-          final imageUrl =
-              (product['image'] != null &&
-                      product['image'] is List &&
-                      product['image'].isNotEmpty)
-                  ? product['image'][0]
-                  : null;
+
+          // Lấy productId từ detail (đây là string ID)
+          final productId = detail['productId'];
+
+          // Lấy thông tin sản phẩm từ productDetails map
+          final product = productDetails[productId] ?? {};
+
+          // Debug: In ra thông tin
+          // print('Detail: $detail');
+          // print('ProductId: $productId');
+          // print('Product from productDetails: $product');
+
+          // Xử lý hình ảnh an toàn
+          String? imageUrl;
+          try {
+            final imageData = product['image'];
+            if (imageData != null) {
+              if (imageData is List && imageData.isNotEmpty) {
+                final firstImage = imageData[0];
+                imageUrl = firstImage?.toString();
+              } else if (imageData is String && imageData.isNotEmpty) {
+                imageUrl = imageData;
+              }
+            }
+          } catch (e) {
+            // print('Error processing image data: $e');
+            // imageUrl = null;
+          }
+
+          // Lấy thông tin sản phẩm với giá trị mặc định
+          final productName =
+              product['name']?.toString() ?? 'Sản phẩm ID: $productId';
+          final productDescription =
+              product['describe']?.toString() ??
+              product['description']?.toString();
+          final productPrice = product['price']; // Giá gốc từ sản phẩm
+          final quantity = detail['quantity'];
+          final totalPrice = detail['totalPrice']; // Tổng giá từ order detail
+
+          // Debug: In ra các giá trị
+          // print('Product name: $productName');
+          // print('Product price: $productPrice');
+          // print('Quantity: $quantity');
+          // print('Total price: $totalPrice');
 
           return Padding(
             padding: const EdgeInsets.all(16),
@@ -459,7 +593,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child:
-                      imageUrl != null
+                      imageUrl != null && imageUrl.isNotEmpty
                           ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
@@ -471,6 +605,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     size: 30,
                                     color: Colors.grey[400],
                                   ),
+                              loadingBuilder: (
+                                context,
+                                child,
+                                loadingProgress,
+                              ) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value:
+                                        loadingProgress.expectedTotalBytes !=
+                                                null
+                                            ? loadingProgress
+                                                    .cumulativeBytesLoaded /
+                                                loadingProgress
+                                                    .expectedTotalBytes!
+                                            : null,
+                                  ),
+                                );
+                              },
                             ),
                           )
                           : Icon(
@@ -485,7 +638,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        product['name'] ?? 'Sản phẩm: ${product['_id'] ?? ''}',
+                        productName,
                         style: const TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 15,
@@ -494,9 +647,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
-                      if (product['describe'] != null) ...[
+                      if (productDescription != null &&
+                          productDescription.isNotEmpty) ...[
                         Text(
-                          product['describe'],
+                          productDescription,
                           style: const TextStyle(
                             fontSize: 12,
                             color: Colors.black54,
@@ -509,7 +663,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Row(
                         children: [
                           Text(
-                            _formatCurrency(product['price']),
+                            _formatCurrency(productPrice),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -521,14 +675,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             style: TextStyle(color: Colors.black54),
                           ),
                           Text(
-                            '${detail['quantity'] ?? 0}',
+                            '${quantity ?? 0}',
                             style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Tổng: ${_formatCurrency(detail['totalPrice'])}',
+                        'Tổng: ${_formatCurrency(totalPrice)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -550,8 +704,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // Tính tổng tiền từ orderDetails
     double subtotal = 0;
     for (var detail in orderDetails) {
-      subtotal += (detail['totalPrice'] ?? 0).toDouble();
+      final totalPrice = detail['totalPrice'];
+      if (totalPrice != null) {
+        if (totalPrice is num) {
+          subtotal += totalPrice.toDouble();
+        } else if (totalPrice is String) {
+          subtotal += double.tryParse(totalPrice) ?? 0;
+        }
+      }
     }
+
+    // Lấy tổng thanh toán từ order
+    final totalOrder = widget.order['totalOrder'];
+    double totalOrderAmount = 0;
+    if (totalOrder != null) {
+      if (totalOrder is num) {
+        totalOrderAmount = totalOrder.toDouble();
+      } else if (totalOrder is String) {
+        totalOrderAmount = double.tryParse(totalOrder) ?? 0;
+      }
+    }
+
+    // Tính phí vận chuyển = tổng thanh toán - tổng tiền hàng - giảm giá
+    final discount = widget.order['discount'] ?? 0;
+    double discountAmount = 0;
+    if (discount is num) {
+      discountAmount = discount.toDouble();
+    } else if (discount is String) {
+      discountAmount = double.tryParse(discount.toString()) ?? 0;
+    }
+
+    double shippingFee = totalOrderAmount - subtotal + discountAmount;
+    if (shippingFee < 0) shippingFee = 0;
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -581,16 +765,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 16),
           _buildPaymentRow('Tổng tiền hàng:', _formatCurrency(subtotal)),
           const SizedBox(height: 12),
-          _buildPaymentRow(
-            'Phí vận chuyển:',
-            _formatCurrency(widget.order['transportId']?['fee'] ?? 0),
-          ),
-          if (widget.order['discount'] != null &&
-              widget.order['discount'] != 0) ...[
+          _buildPaymentRow('Phí vận chuyển:', _formatCurrency(shippingFee)),
+          if (discountAmount > 0) ...[
             const SizedBox(height: 12),
             _buildPaymentRow(
               'Giảm giá:',
-              '-${_formatCurrency(widget.order['discount'])}',
+              '-${_formatCurrency(discountAmount)}',
               isDiscount: true,
             ),
           ],
@@ -599,7 +779,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 12),
           _buildPaymentRow(
             'Tổng thanh toán:',
-            _formatCurrency(widget.order['totalOrder']),
+            _formatCurrency(totalOrderAmount),
             isTotal: true,
           ),
           const SizedBox(height: 16),
@@ -615,18 +795,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildActionButtons(String status) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
+    List<Widget> buttons = [];
+
+    // Nút hỗ trợ luôn có
+    buttons.add(
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () {
+            // Contact support functionality
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tính năng hỗ trợ đang phát triển')),
+            );
+          },
+          icon: const Icon(Icons.support_agent),
+          label: const Text('Hỗ trợ'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    buttons.add(const SizedBox(width: 12));
+
+    // Nút theo trạng thái
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'đã giao':
+        buttons.add(
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // Contact support functionality
-              },
-              icon: const Icon(Icons.support_agent),
-              label: const Text('Hỗ trợ'),
-              style: OutlinedButton.styleFrom(
+            child: ElevatedButton.icon(
+              onPressed: () => _showConfirmDeliveryDialog(),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Xác nhận giao hàng'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -634,16 +841,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+        );
+        break;
+      case 'cancelled':
+      case 'đã hủy':
+        buttons.add(
           Expanded(
             child: ElevatedButton.icon(
-              onPressed:
-                  status.toLowerCase() == 'đã hủy' ||
-                          status.toLowerCase() == 'cancelled'
-                      ? null
-                      : () {
-                        // Order tracking functionality
-                      },
+              onPressed: null, // Disabled
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Đã hủy'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        );
+        break;
+      default:
+        buttons.add(
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Order tracking functionality
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Tính năng theo dõi đang phát triển'),
+                  ),
+                );
+              },
               icon: const Icon(Icons.local_shipping_outlined),
               label: const Text('Theo dõi'),
               style: ElevatedButton.styleFrom(
@@ -654,9 +883,183 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           ),
-        ],
-      ),
+        );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(children: buttons),
     );
+  }
+
+  void _showConfirmDeliveryDialog() {
+    String feedback = '';
+    int rating = 5;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text(
+                'Xác nhận giao hàng thành công',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bạn đã nhận được hàng và hài lòng với đơn hàng này?',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Đánh giá của bạn:',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          onPressed: () {
+                            setState(() {
+                              rating = index + 1;
+                            });
+                          },
+                          icon: Icon(
+                            index < rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 30,
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nhận xét (tùy chọn):',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Chia sẻ trải nghiệm của bạn về sản phẩm...',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.all(12),
+                      ),
+                      onChanged: (value) {
+                        feedback = value;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Hủy'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _confirmDelivery(feedback, rating);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Xác nhận'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDelivery(String feedback, int rating) async {
+    try {
+      // Hiển thị loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(child: CircularProgressIndicator());
+        },
+      );
+
+      // Lấy userId từ SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null) {
+        Navigator.pop(context); // Đóng loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không tìm thấy thông tin người dùng')),
+        );
+        return;
+      }
+
+      // Gọi API xác nhận giao hàng - sử dụng order detail ID đầu tiên
+      if (orderDetails.isNotEmpty) {
+        final orderDetailId = orderDetails[0]['_id'];
+
+        final response = await http.put(
+          Uri.parse(
+            'http://localhost:4001/api/orderDetails/customer/confirm-delivery/$orderDetailId',
+          ),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'userId': userId,
+            'feedback': feedback.isEmpty ? 'Sản phẩm tốt' : feedback,
+            'rating': rating,
+          }),
+        );
+
+        Navigator.pop(context); // Đóng loading dialog
+
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã xác nhận giao hàng thành công!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Refresh lại dữ liệu
+          fetchOrderDetails();
+
+          // Có thể pop về màn hình trước hoặc update UI
+          Navigator.pop(context);
+        } else {
+          final errorMessage =
+              json.decode(response.body)['message'] ?? 'Có lỗi xảy ra';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Xác nhận thất bại: $errorMessage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        Navigator.pop(context); // Đóng loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không tìm thấy thông tin chi tiết đơn hàng'),
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Đóng loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi kết nối: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Widget _buildInfoRow(String label, String value, IconData icon) {
